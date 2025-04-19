@@ -8,21 +8,31 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-char *lshReadLine(void);
-void lshExecute(char *line);
+char *ReadLine(void);
+void Execute(char *line, const char *shellRoot);
 void wishCat(int argc, char **argv);
 int changeDirectory(char *args[]);
-void wishPwd();
+void wishPwd(const char *shellRoot);
 void wishHelp();
+void wishLs();
+void wishLsLa();
+//void wishPath(char *input);
+void wishEcho(int argc, char **argv);
 
 int main() {
     char *line = NULL;
     size_t len = 0;
 
+    char shellRoot[1024];
+    if (getcwd(shellRoot, sizeof(shellRoot)) == NULL) {
+        perror("getcwd");
+        exit(1);
+    }
+
     do {
         printf("wish> ");
 
-        line = lshReadLine();
+        line = ReadLine();
         
         if (line == NULL) {
             printf("Error reading line\n");
@@ -36,7 +46,7 @@ int main() {
         }
 
         line[strcspn(line, "\n")] = 0;
-        lshExecute(line);
+        Execute(line, shellRoot);
 
         free(line);
         line = NULL;
@@ -46,7 +56,7 @@ int main() {
     return 0;
 }
 
-char *lshReadLine(void) {
+char *ReadLine(void) {
     char *line = NULL;
     size_t len = 0;
 
@@ -64,7 +74,7 @@ char *lshReadLine(void) {
     return line;
 }
 
-void lshExecute(char *line) {
+void Execute(char *line, const char *shellRoot) {
 
     char *args[64];
     char *token = strtok(line, " ");
@@ -90,12 +100,32 @@ void lshExecute(char *line) {
     }
 
     if (strcmp(args[0], "pwd") == 0) {
-        wishPwd();
+        wishPwd(shellRoot);
         return;
     }
 
     if (strcmp(args[0], "help") == 0) {
         wishHelp();
+        return;
+    }
+
+    if (strcmp(args[0], "ls") == 0 && args[1] != NULL && strcmp(args[1], "-la") == 0) {
+        wishLsLa();
+        return;
+    }
+
+    if (strcmp(args[0], "ls") == 0) {
+        wishLs();
+        return;
+    }
+
+    /*if (strcmp(args[0], "path") == 0) {
+        wishPath(line + 5);
+        return;
+    }*/
+
+    if (strcmp(args[0], "echo") == 0) {
+        wishEcho(i, args);
         return;
     }
 
@@ -117,12 +147,29 @@ void lshExecute(char *line) {
         perror("fork");
         exit(1);
     }
+
+    //runCommand(line);
 }
+
+/*void runCommand(char *command) {
+    char *args[500];
+    char *token = strtok(command, " ");
+    int i = 0;
+
+    while (token != NULL && i < 64) {
+        args[i++] = token;
+        token = strtok(NULL, " ");
+    } args[i] = NULL;
+
+    if (execvp(args[0], args) == -1) {
+        perror("execvp");
+    }
+}*/
 
 void wishCat(int argc, char **argv) {
 
     if (argc < 2) {
-        fprintf(stderr, "cat: expected file arguments\n\n");
+        fprintf(stderr, "cat: expected file arguments\n");
         return;
     }
 
@@ -163,16 +210,15 @@ int changeDirectory(char *args[]) {
     return 0;
 }
 
-void wishPwd() {
+void wishPwd(const char *shellRoot) {
     char cwd[1024];
-    char *rootPath = "/home/liisa/wish_shell";
 
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        
-        if (strncmp(cwd, rootPath, strlen(rootPath)) == 0) {
-            printf("/wish%s\n", cwd + strlen(rootPath)); 
+        const char *relative = cwd + strlen(shellRoot);
+        if (relative[0] == '\0') {
+            printf("/wish\n"); 
         } else {
-            printf("%s\n", cwd);
+            printf("/wish%s\n", relative);
         }
     } else {
         perror("getcwd() error");
@@ -185,4 +231,121 @@ void wishHelp() {
     printf("  cat [file]   - print file contents\n");
     printf("  pwd          - print current directory\n");
     printf("  exit         - exit the shell\n");
+    printf("  help         - show this help message\n");
+    printf("  ls           - list files in current directory\n");
+    printf("  ls -la       - list all files in current directory\n");
+    printf("  echo [text]  - print text to stdout\n");
+    printf("  echo [text] > [file] - write text to file\n");
+    printf("  path [dir1:dir2:...] - set PATH variable\n");
+    printf("  path         - print current PATH variable\n");
+    printf("  path [dir]   - add directory to PATH\n");
+}
+
+void wishLs() {
+    pid_t pid = fork();
+
+    if (pid == -1) {
+        perror("fork");
+        return;
+    }
+
+    if (pid == 0) {
+        char *args[] = {"/bin/ls", NULL};
+        execv(args[0], args);
+        perror("execv");
+        exit(1);
+    } else if (pid > 0) {
+        wait(NULL);
+    } else {
+        perror("fork");
+        exit(1);
+    }
+}
+
+void wishLsLa() {
+    pid_t pid = fork();
+
+    if (pid == -1) {
+        perror("fork");
+        return;
+    }
+
+    if (pid == 0) {
+        char *args[] = {"/bin/ls", "-la", NULL};
+        execv(args[0], args);
+        perror("execv");
+        exit(1);
+    } else if (pid > 0) {
+        wait(NULL);
+    } else {
+        perror("fork");
+        exit(1);
+    }
+}
+
+/*void wishPath(char *input) {
+    char *pathList[100];
+    int pathCount = 0;
+
+    // Pilkotaan syöte ja tallennetaan polut
+    char *token = strtok(input, " ");
+    while (token != NULL) {
+        pathList[pathCount] = strdup(token);
+        pathCount++;
+        token = strtok(NULL, " ");
+    }
+
+    if (pathCount > 0) {
+        char newPath[1024] = "";
+
+        for (int i = 0; i < pathCount; i++) {
+            strcat(newPath, pathList[i]);
+            if (i < pathCount - 1) {
+                strcat(newPath, ":");
+            }
+        }
+
+        if (setenv("PATH", newPath, 1) == -1) {
+            perror("setenv failed");
+        } else {
+            printf("PATH set to: %s\n", newPath);
+        }
+    } else {
+        printf("No paths provided\n");
+    }
+
+    for (int i = 0; i < pathCount; i++) {
+        free(pathList[i]);
+    }
+}*/
+
+void wishEcho(int argc, char **argv) {
+
+    if (argc < 2) {
+        fprintf(stderr, "echo: expected file arguments\n");
+        return;
+    }
+
+    if (strcmp(argv[argc - 2], ">") == 0) {
+        FILE *file = fopen(argv[argc - 1], "w");
+        if (file == NULL) {
+            perror("Cannot open file for writing\n");
+            return;
+        }
+
+        for (int i = 1; i < argc - 2; i++) {
+            fprintf(file, "%s ", argv[i]);
+        }
+        fprintf(file, "\n");
+
+        fclose(file);
+
+        printf("Output written to %s\n", argv[argc - 1]);
+
+    } else {
+        for (int i = 1; i < argc; i++) {
+            printf("%s ", argv[i]);
+        }
+        printf("\n");
+    }
 }
