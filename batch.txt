@@ -1,0 +1,8 @@
+pwd
+echo Hello batch mode
+cd test
+pwd
+cd ..
+ls
+invalidcommand
+exit
