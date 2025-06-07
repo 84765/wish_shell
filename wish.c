@@ -3,6 +3,8 @@
 //https://github.com/jmreyes/simple-c-shell/blob/master/simple-c-shell.c
 //https://stackoverflow.com/questions/24538470/what-does-dup2-do-in-c
 //https://www.geeksforgeeks.org/dup-dup2-linux-system-call/
+//https://www.digitalocean.com/community/tutorials/how-to-view-and-update-the-linux-path-environment-variable
+//https://askubuntu.com/questions/9848/what-are-path-and-bin-how-can-i-have-personal-scripts
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,8 +30,20 @@ void wishEcho(int argc, char **argv, int redirect, char *outfile);
 
 char *wishPathList[100];
 int wishPathCount = 0;
+int path_modified = 0;
+
+void clear_path_list() {
+    for (int i = 0; i < wishPathCount; i++) {
+        free(wishPathList[i]);
+        wishPathList[i] = NULL;
+    }
+    wishPathCount = 0;
+}
 
 int main(int argc, char *argv[]) {
+
+    wishPathList[wishPathCount++] = strdup("/bin");
+    wishPathList[wishPathCount++] = strdup("/usr/bin");
 
     FILE *inputFile = stdin;
 
@@ -76,7 +90,9 @@ int main(int argc, char *argv[]) {
 
         char *lineCopy = strdup(line);
         char *cmd = strtok(lineCopy, " ");
+
         if (cmd != NULL && strcmp(cmd, "cd") == 0) {
+
             char *arg = strtok(NULL, " ");
             char *args[] = {cmd, arg, NULL};
             changeDirectory(args, shellRoot);
@@ -89,34 +105,35 @@ int main(int argc, char *argv[]) {
         if (strncmp(line, "exit", 4) == 0 && 
             (line[4] == '\0' || line[4] == ' ')) {
 
-                char *temp = strdup(line);
-                char *args[10];
-                int i = 0;
-                char *token = strtok(temp, " ");
+            char *temp = strdup(line);
+            char *args[10];
+            int i = 0;
+            char *token = strtok(temp, " ");
 
-                while (token != NULL && i < 10) {
-                    args[i++] = token;
-                    token = strtok(NULL, " ");
-                }
-
-                if (i > 1) {
-                    fprintf(stderr, "exit: too many arguments\n");
-                    free(temp);
-                    free(line);
-                    continue;
-                }
-
-                free(temp);
-                printf("Goodbye!\n");
-                free(line);
-                exit(0);
+            while (token != NULL && i < 10) {
+                args[i++] = token;
+                token = strtok(NULL, " ");
             }
+
+            if (i > 1) {
+                fprintf(stderr, "exit: too many arguments\n");
+                free(temp);
+                free(line);
+                continue;
+            }
+
+            free(temp);
+            printf("Goodbye!\n");
+            free(line);
+            exit(0);
+        }
 
         if (strncmp(line, "path", 4) == 0 && 
             (line[4] == '\0' || line[4] == ' ')) {
 
             wishPath(strdup(line));
             free(line);
+
             continue;
         }
 
@@ -130,6 +147,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+// Reads a line from standard input
 char *ReadLine(void) {
     char *line = NULL;
     size_t len = 0;
@@ -202,7 +220,7 @@ void Execute(char *line, const char *shellRoot) {
         } else {
             perror("fork");
         }
-    }
+    } 
 
     for (int i = 0; i < count; i++) {
         waitpid(pids[i], NULL, 0);
@@ -231,7 +249,7 @@ void runSingleCommand(char *line, const char *shellRoot) {
                 return;
             }
             
-            printf("Redirecting output to file: %s\n", token);
+            printf("Output written to file: %s\n", token);
             
             outputFile = token;
             token = strtok(NULL, " ");
@@ -244,14 +262,6 @@ void runSingleCommand(char *line, const char *shellRoot) {
 
     if (args[0] == NULL) {
         return;
-    }
-
-    // Katso myöhemmin tarpeellisuus
-    if (strcmp(args[0], "exit") == 0 && 
-        (args[1] == NULL || strcmp(args[1], "") == 0)) {
-        printf("Goodbye!\n");
-        free(line);
-        exit(0);
     }
 
     if (strcmp(args[0], "cd") == 0) {
@@ -304,15 +314,6 @@ void runSingleCommand(char *line, const char *shellRoot) {
         return;
     }
 
-    /*if (strcmp(args[0], "path") == 0) {
-        if (redirectOutput && outputFile != NULL) {
-            writeOutputToFile(redirectOutput, outputFile);
-        }
-
-        wishPath(strdup(lineOrginal));
-        return;
-    } */
-
     if (strcmp(args[0], "echo") == 0) {
         wishEcho(i, args, redirectOutput, outputFile);
         return;
@@ -324,9 +325,6 @@ void runSingleCommand(char *line, const char *shellRoot) {
         perror("fork");
         return;
     } else if (pid == 0) {
-        /*execvp(args[0], args);
-        perror("execvp failed");
-        exit(1);*/
         char *path = searchExecutable(args[0]);
         if (path) {
             execv(path, args);
@@ -353,6 +351,7 @@ char *searchExecutable(const char *command) {
     return NULL;
 }
 
+// tarkista virheenkäsittely, luo uuden tiedosto jos ei ole ihan millä tahansa nimellä
 void writeOutputToFile(int redirectOutput, const char *outputFile) {
 
     int fd = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -370,6 +369,12 @@ void writeOutputToFile(int redirectOutput, const char *outputFile) {
 
 void wishCat(int argc, char **argv) {
 
+    char *path = searchExecutable("cat");
+    if (path == NULL) {
+        fprintf(stderr, "cat: command not found\n");
+        return;
+    }
+
     if (argc < 2) {
         fprintf(stderr, "cat: expected file arguments\n");
         return;
@@ -378,7 +383,7 @@ void wishCat(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         FILE *file = fopen(argv[i], "r");
         if (file == NULL) {
-            perror("Cannot open file\n");
+            perror("Cannot open file");
             continue;
         }
 
@@ -434,6 +439,12 @@ int changeDirectory(char *args[], const char *shellRoot) {
 void wishPwd(const char *shellRoot) {
     char cwd[1024];
 
+    char *path = searchExecutable("pwd");
+    if (path == NULL) {
+        fprintf(stderr, "pwd: command not found\n");
+        return;
+    }
+
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
         const char *relative = cwd + strlen(shellRoot);
         if (relative[0] == '\0') {
@@ -457,16 +468,19 @@ void wishHelp() {
     printf("  ls -la       - list all files in current directory\n");
     printf("  echo [text]  - print text to stdout\n");
     printf("  echo [text] > [file] - write text to file\n");
-    printf("  path [dir1:dir2:...] - set PATH variable\n"); // tarkista
-    printf("  path         - print current PATH variable\n"); // tarkista
-    printf("  path [dir]   - add directory to PATH\n"); // tarkista
-    printf("  path         - print current PATH variable\n"); // tarkista
-    printf("  &            - run commands in parallel\n");
+    printf("  path [dirs]  - set or print PATH directories\n");
     printf("  > [file]     - redirect output to file\n");
     printf("  Note: 'wish' is the name of this shell.\n");
 }
 
 void wishLs() {
+
+    char *path = searchExecutable("ls");
+    if (path == NULL) {
+        fprintf(stderr, "ls: command not found\n");
+        return;
+    }
+
     pid_t pid = fork();
 
     if (pid == -1) {
@@ -475,19 +489,23 @@ void wishLs() {
     }
 
     if (pid == 0) {
-        char *args[] = {"/bin/ls", NULL};
-        execv(args[0], args);
+        char *args[] = {path, NULL};
+        execv(path, args);
         perror("execv");
         exit(1);
-    } else if (pid > 0) {
-        wait(NULL);
     } else {
-        perror("fork");
-        exit(1);
+        wait(NULL);
     }
 }
 
 void wishLsLa() {
+
+    char *path = searchExecutable("ls");
+    if (path == NULL) {
+        fprintf(stderr, "ls -la: command not found\n");
+        return;
+    }
+
     pid_t pid = fork();
 
     if (pid == -1) {
@@ -496,20 +514,23 @@ void wishLsLa() {
     }
 
     if (pid == 0) {
-        char *args[] = {"/bin/ls", "-la", NULL};
-        execv(args[0], args);
+        char *args[] = {path, "-la", NULL};
+        execv(path, args);
         perror("execv");
         exit(1);
-    } else if (pid > 0) {
-        wait(NULL);
     } else {
-        perror("fork");
-        exit(1);
+        wait(NULL);
     }
 }
 
 void wishPath(char *input) {
     char *args = strchr(input, ' ');
+
+    path_modified += 1;
+
+    if (path_modified == 1) {
+        clear_path_list();
+    }
 
     if (args == NULL) {
         if (wishPathCount == 0) {
@@ -547,9 +568,11 @@ void wishPath(char *input) {
     }
 
     free(pathsCopy);
+
+    path_modified += 1;
 }
 
-// tarkista on ylimäiräistä
+// luo tiedoston, jos ei ole massa tarkista kuuluko niin tehä
 void wishEcho(int argc, char **argv, int redirect, char *outfile) {
     if (argc < 2) {
         fprintf(stderr, "echo: expected arguments\n");
@@ -575,17 +598,13 @@ void wishEcho(int argc, char **argv, int redirect, char *outfile) {
 
     if (output != stdout) {
         fclose(output);
-        printf("Output written to %s\n", outfile);
     }
 }
 
 
 // virheen käsittely preammanksi
+// virheen käsittely jos tiesdotoa ei ole
 
-// path puuttu varsinainen execvp
-// (voit käyttää access() + execv() PATH-hakemistoista 
-// hakemiseen, kuten projektiohjeessa mainittu)
-
-// exit toimi, mutta batch-tiedostossa se toimii kun sana sisältää vain exit
+// exit toimii, mutta batch-tiedostossa se toimii kun sana sisältää vain exit
 
 // virheen käsittely jos tiesdotoa ei ole
