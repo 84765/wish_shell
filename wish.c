@@ -15,9 +15,10 @@ char *ReadLine(void);
 char *readLineForFile(FILE *inputFile);
 void Execute(char *line, const char *shellRoot);
 void runSingleCommand(char *line, const char *shellRoot);
+char *searchExecutable(const char *command);
 void writeOutputToFile(int redirectOutput, const char *outputFile);
 void wishCat(int argc, char **argv);
-int changeDirectory(char *args[]);
+int changeDirectory(char *args[], const char *shellRoot);
 void wishPwd(const char *shellRoot);
 void wishHelp();
 void wishLs();
@@ -29,6 +30,7 @@ char *wishPathList[100];
 int wishPathCount = 0;
 
 int main(int argc, char *argv[]) {
+
     FILE *inputFile = stdin;
 
     if (argc == 2) {
@@ -77,7 +79,7 @@ int main(int argc, char *argv[]) {
         if (cmd != NULL && strcmp(cmd, "cd") == 0) {
             char *arg = strtok(NULL, " ");
             char *args[] = {cmd, arg, NULL};
-            changeDirectory(args);
+            changeDirectory(args, shellRoot);
             free(lineCopy);
             free(line);
             continue;
@@ -109,6 +111,14 @@ int main(int argc, char *argv[]) {
                 free(line);
                 exit(0);
             }
+
+        if (strncmp(line, "path", 4) == 0 && 
+            (line[4] == '\0' || line[4] == ' ')) {
+
+            wishPath(strdup(line));
+            free(line);
+            continue;
+        }
 
         Execute(line, shellRoot);
 
@@ -166,6 +176,10 @@ char *readLineForFile(FILE *inputFile) {
 
 void Execute(char *line, const char *shellRoot) {
 
+    char lineCopy[1024];
+    strncpy(lineCopy, line, sizeof(lineCopy));
+    lineCopy[sizeof(lineCopy) - 1] = '\0';
+
     char *command[64];
     int count = 0;
     char *saveptr;
@@ -193,13 +207,13 @@ void Execute(char *line, const char *shellRoot) {
     for (int i = 0; i < count; i++) {
         waitpid(pids[i], NULL, 0);
     }
-    
-    char lineCopy[1024];
-    strncpy(lineCopy, line, sizeof(lineCopy));
-    lineCopy[sizeof(lineCopy) - 1] = '\0';
 }
 
 void runSingleCommand(char *line, const char *shellRoot) {
+    char lineOrginal[1024];
+    strncpy(lineOrginal, line, sizeof(lineOrginal));
+    lineOrginal[sizeof(lineOrginal) - 1] = '\0';
+    
     char *args[64];
     char *token = strtok(line, " ");
     int i = 0;
@@ -241,7 +255,7 @@ void runSingleCommand(char *line, const char *shellRoot) {
     }
 
     if (strcmp(args[0], "cd") == 0) {
-        changeDirectory(args);
+        changeDirectory(args, shellRoot);
         return;
     }
 
@@ -290,15 +304,14 @@ void runSingleCommand(char *line, const char *shellRoot) {
         return;
     }
 
-    if (strcmp(args[0], "path") == 0) {
+    /*if (strcmp(args[0], "path") == 0) {
         if (redirectOutput && outputFile != NULL) {
             writeOutputToFile(redirectOutput, outputFile);
         }
 
-        char *restOfLine = strchr(line, ' ');
-        wishPath(restOfLine ? restOfLine + 1 : NULL);
+        wishPath(strdup(lineOrginal));
         return;
-    }
+    } */
 
     if (strcmp(args[0], "echo") == 0) {
         wishEcho(i, args, redirectOutput, outputFile);
@@ -311,12 +324,33 @@ void runSingleCommand(char *line, const char *shellRoot) {
         perror("fork");
         return;
     } else if (pid == 0) {
-        execvp(args[0], args);
+        /*execvp(args[0], args);
         perror("execvp failed");
+        exit(1);*/
+        char *path = searchExecutable(args[0]);
+        if (path) {
+            execv(path, args);
+            perror("execv failed");
+        } else {
+            fprintf(stderr, "%s: command not found\n", args[0]);
+        }
         exit(1);
     } else {
         wait(NULL);
     }
+}
+
+char *searchExecutable(const char *command) {
+    static char fullPath[1024];
+    
+    for (int i = 0; i < wishPathCount; i++) {
+        snprintf(fullPath, sizeof(fullPath), "%s/%s", wishPathList[i], command);
+        if (access(fullPath, X_OK) == 0) {
+            return fullPath;
+        }
+    }
+
+    return NULL;
 }
 
 void writeOutputToFile(int redirectOutput, const char *outputFile) {
@@ -360,7 +394,19 @@ void wishCat(int argc, char **argv) {
     }
 }
 
-int changeDirectory(char *args[]) {
+int changeDirectory(char *args[], const char *shellRoot) {
+
+    char cwd[1024];
+
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        perror("getcwd");
+        return -1;
+    }
+    
+    if (args[1] == NULL) {
+        fprintf(stderr, "cd: no directory specified\n");
+        return -1;
+    }
 
     if (args[1] == NULL) {
         if (chdir(getenv("HOME")) == -1) {
@@ -368,11 +414,18 @@ int changeDirectory(char *args[]) {
             return -1;
         }
         return 1;
-    } else {
-        if (chdir(args[1]) == -1) {
-            printf("%s: no such directory\n", args[1]);
-            return -1;
+    }
+
+    if (strcmp(args[1], "..") == 0) {
+        if (strcmp(cwd, shellRoot) == 0) {
+            printf("Already at root directory\n");
+            return 0;
         }
+    }
+
+    if (chdir(args[1]) == -1) {
+        printf("%s: no such directory\n", args[1]);
+        return -1;
     }
 
     return 0;
@@ -404,9 +457,13 @@ void wishHelp() {
     printf("  ls -la       - list all files in current directory\n");
     printf("  echo [text]  - print text to stdout\n");
     printf("  echo [text] > [file] - write text to file\n");
-    printf("  path [dir1:dir2:...] - set PATH variable\n");
-    printf("  path         - print current PATH variable\n");
-    printf("  path [dir]   - add directory to PATH\n");
+    printf("  path [dir1:dir2:...] - set PATH variable\n"); // tarkista
+    printf("  path         - print current PATH variable\n"); // tarkista
+    printf("  path [dir]   - add directory to PATH\n"); // tarkista
+    printf("  path         - print current PATH variable\n"); // tarkista
+    printf("  &            - run commands in parallel\n");
+    printf("  > [file]     - redirect output to file\n");
+    printf("  Note: 'wish' is the name of this shell.\n");
 }
 
 void wishLs() {
@@ -452,46 +509,52 @@ void wishLsLa() {
 }
 
 void wishPath(char *input) {
+    char *args = strchr(input, ' ');
 
-    if (input == NULL || strlen(input) == 0) {
-        printf("wish PATH: ");
+    if (args == NULL) {
         if (wishPathCount == 0) {
-            printf("(no path set)\n");
-        } else {
-            for (int i = 0; i < wishPathCount; i++) {
-                printf("%s", wishPathList[i]);
-                if (i < wishPathCount - 1) printf(":");
-            }
-            printf("\n");
+            printf("PATH is empty\n");
+            return;
         }
+
+        for (int i = 0; i < wishPathCount; i++) {
+            printf("%s", wishPathList[i]);
+            if (i < wishPathCount - 1) printf(":");
+        }
+
+        printf("\n");
         return;
     }
 
+    args++; 
+
+    char *pathsCopy = strdup(args);
+    if (pathsCopy == NULL) {
+        perror("strdup failed");
+        return;
+    }
+    
     for (int i = 0; i < wishPathCount; i++) {
         free(wishPathList[i]);
+        wishPathList[i] = NULL;
     }
     wishPathCount = 0;
 
-    char *token = strtok(input, ":");
-    while (token != NULL && wishPathCount < 100) {
-        wishPathList[wishPathCount] = strdup(token);
-        if (wishPathList[wishPathCount] == NULL) {
-            perror("strdup failed");
-            exit(1);
-        }
-        wishPathCount++;
-        token = strtok(NULL, ":");
+    char *subtoken = strtok(pathsCopy, ":");
+    while (subtoken != NULL) {
+        wishPathList[wishPathCount++] = strdup(subtoken);
+        subtoken = strtok(NULL, ":");
     }
 
-    printf("wish PATH updated\n");
+    free(pathsCopy);
 }
 
+// tarkista on ylimäiräistä
 void wishEcho(int argc, char **argv, int redirect, char *outfile) {
     if (argc < 2) {
         fprintf(stderr, "echo: expected arguments\n");
         return;
     }
-
 
     FILE *output = stdout;
 
@@ -517,23 +580,12 @@ void wishEcho(int argc, char **argv, int redirect, char *outfile) {
 }
 
 
-
-// > kirjoittaa tulosteen halutuun tiedostoon - valmis
 // virheen käsittely preammanksi
+
 // path puuttu varsinainen execvp
 // (voit käyttää access() + execv() PATH-hakemistoista 
 // hakemiseen, kuten projektiohjeessa mainittu)
+
 // exit toimi, mutta batch-tiedostossa se toimii kun sana sisältää vain exit
-// tarkista ctrl+D (EOF) -tilanne, se tulostaa sen wish> vaikka ei kuuluisi
-// cd virheen käsittely sekoaa .. oletuksessa, sekoittaa kaiken toiminnan
+
 // virheen käsittely jos tiesdotoa ei ole
-
-/*Also test error cases:
-
-cd with no args
-
-exit extra
-
-Invalid paths in path
-
-Unknown commands*/
