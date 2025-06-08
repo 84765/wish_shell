@@ -1,10 +1,3 @@
-//https://brennan.io/2015/01/16/write-a-shell-in-c/
-//https://www.geeksforgeeks.org/making-linux-shell-c/
-//https://github.com/jmreyes/simple-c-shell/blob/master/simple-c-shell.c
-//https://stackoverflow.com/questions/24538470/what-does-dup2-do-in-c
-//https://www.geeksforgeeks.org/dup-dup2-linux-system-call/
-//https://www.digitalocean.com/community/tutorials/how-to-view-and-update-the-linux-path-environment-variable
-//https://askubuntu.com/questions/9848/what-are-path-and-bin-how-can-i-have-personal-scripts
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,6 +55,7 @@ int main(int argc, char *argv[]) {
     size_t len = 0;
     char shellRoot[1024];
 
+    // https://stackoverflow.com/questions/298510/how-to-get-the-current-directory-in-a-c-program
     if (getcwd(shellRoot, sizeof(shellRoot)) == NULL) {
         perror("getcwd");
         exit(1);
@@ -70,6 +64,7 @@ int main(int argc, char *argv[]) {
     do {
         if (inputFile == stdin) {
             printf("wish> ");
+            //(lähde: 9. https://www.geeksforgeeks.org/use-fflushstdin-c/
             fflush(stdout);
             line = ReadLine();
         } else {
@@ -86,6 +81,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        //(lähde: https://www.geeksforgeeks.org/strcspn-in-c/)
         line[strcspn(line, "\n")] = 0;
 
         char *lineCopy = strdup(line);
@@ -102,6 +98,7 @@ int main(int argc, char *argv[]) {
         }
         free(lineCopy);
 
+        // (strncmp: https://www.w3schools.com/c/ref_string_strncmp.php)
         if (strncmp(line, "exit", 4) == 0 && 
             (line[4] == '\0' || line[4] == ' ')) {
 
@@ -110,6 +107,7 @@ int main(int argc, char *argv[]) {
             int i = 0;
             char *token = strtok(temp, " ");
 
+            // (lähde: https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/)
             while (token != NULL && i < 10) {
                 args[i++] = token;
                 token = strtok(NULL, " ");
@@ -147,6 +145,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+// käytetty lähdettä - https://brennan.io/2015/01/16/write-a-shell-in-c/
 // Reads a line from standard input
 char *ReadLine(void) {
     char *line = NULL;
@@ -166,7 +165,9 @@ char *ReadLine(void) {
     return line;
 }
 
+// Reads a line from a file (batch.txt) and returns a copy of the line
 char *readLineForFile(FILE *inputFile) {
+    // size_t ja muu pitäisi löytyy muista koodeista, katso linkit/lähteet
     char *line = NULL;
     size_t len = 0;
 
@@ -192,6 +193,16 @@ char *readLineForFile(FILE *inputFile) {
     return copy;
 }
 
+// Executes a command line, splitting it by '&' and running each command in parallel
+// Each command is run in a separate child process
+
+// lähteet: 
+// https://jacksonmowry.github.io/shell.html
+// https://brennan.io/2015/01/16/write-a-shell-in-c/
+
+// Fork-virheen käsittely on jo, mutta jos fork() epäonnistuu, 
+// ohjelma jatkaa silti (vain perror).
+// Voisi olla järkevää palata tai lopettaa komennon suoritus siinä kohdassa.
 void Execute(char *line, const char *shellRoot) {
 
     char lineCopy[1024];
@@ -244,8 +255,9 @@ void runSingleCommand(char *line, const char *shellRoot) {
         if (strcmp(token, ">") == 0) {
             redirectOutput = 1;
             token = strtok(NULL, " ");
+
             if (token == NULL) {
-                perror("No output file specified");
+                fprintf(stderr, "Syntax error: expected output file after '>'\n");
                 return;
             }
             
@@ -361,6 +373,7 @@ void writeOutputToFile(int redirectOutput, const char *outputFile) {
         exit(1);
     }
 
+    // https://www.geeksforgeeks.org/dup-dup2-linux-system-call/
     dup2(fd, STDOUT_FILENO);
     close(fd);
 
@@ -523,6 +536,9 @@ void wishLsLa() {
     }
 }
 
+// Kun annetaan polkuja, ei tarkisteta, 
+// ovatko ne olemassa tai ovatko ne hakemistoja.
+// Voisi lisätä tarkistuksen, onko annettu polku kelvollinen hakemisto.
 void wishPath(char *input) {
     char *args = strchr(input, ' ');
 
@@ -569,10 +585,11 @@ void wishPath(char *input) {
 
     free(pathsCopy);
 
-    path_modified += 1;
+    path_modified = 2;
 }
 
-// luo tiedoston, jos ei ole massa tarkista kuuluko niin tehä
+// Prints the arguments passed to echo command
+// If output redirection is specified, writes to the specified file
 void wishEcho(int argc, char **argv, int redirect, char *outfile) {
     if (argc < 2) {
         fprintf(stderr, "echo: expected arguments\n");
@@ -600,11 +617,3 @@ void wishEcho(int argc, char **argv, int redirect, char *outfile) {
         fclose(output);
     }
 }
-
-
-// virheen käsittely preammanksi
-// virheen käsittely jos tiesdotoa ei ole
-
-// exit toimii, mutta batch-tiedostossa se toimii kun sana sisältää vain exit
-
-// virheen käsittely jos tiesdotoa ei ole
