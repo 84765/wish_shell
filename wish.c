@@ -1,36 +1,39 @@
 // Creators: Annika Hovilehto & Irem Yasar
 
+// AI statement:
+// ChatGpt was used to help understanding errors and code better, translation help, explain how to use some of the handling functions.
+
 // - Basic structure and logic of the shell
-// https://brennan.io/2015/01/16/write-a-shell-in-c/
-// https://www.geeksforgeeks.org/making-linux-shell-c/
-// https://github.com/jmreyes/simple-c-shell/blob/master/simple-c-shell.c
-// https://jacksonmowry.github.io/shell.html
+// 1.   https://brennan.io/2015/01/16/write-a-shell-in-c/
+// 2.   https://www.geeksforgeeks.org/making-linux-shell-c/
+// 3.   https://github.com/jmreyes/simple-c-shell/blob/master/simple-c-shell.c
+// 4.   https://jacksonmowry.github.io/shell.html
 //
 // - Shell syntax and usage with examples
-// https://www.grymoire.com/Unix/Csh.html  // Basic usage: commands, piping, redirections
+// 5.   https://www.grymoire.com/Unix/Csh.html  // Basic usage: commands, piping, redirections
 //
 // - dup2 and file handling
-// https://stackoverflow.com/questions/298510/how-to-get-the-current-directory-in-a-c-program
-// https://www.geeksforgeeks.org/dup-dup2-linux-system-call/
-// https://stackoverflow.com/questions/63484842/using-o-creat-o-wronly-how-to-get-current-position-in-the-file-and-append-data
-// https://stackoverflow.com/questions/24538470/what-does-dup2-do-in-c
+// 6.   https://stackoverflow.com/questions/298510/how-to-get-the-current-directory-in-a-c-program
+// 7.   https://www.geeksforgeeks.org/dup-dup2-linux-system-call/
+// 8.   https://stackoverflow.com/questions/63484842/using-o-creat-o-wronly-how-to-get-current-position-in-the-file-and-append-data
+// 9.   https://stackoverflow.com/questions/24538470/what-does-dup2-do-in-c
 //
 // - PATH and environment variables
-// https://www.digitalocean.com/community/tutorials/how-to-view-and-update-the-linux-path-environment-variable
-// https://askubuntu.com/questions/9848/what-are-path-and-bin-how-can-i-have-personal-scripts
+// 10.  https://www.digitalocean.com/community/tutorials/how-to-view-and-update-the-linux-path-environment-variable
+// 11.  https://askubuntu.com/questions/9848/what-are-path-and-bin-how-can-i-have-personal-scripts
 //
 // - String handling functions
-// https://www.w3schools.com/c/ref_string_strncmp.php
-// https://www.geeksforgeeks.org/strcspn-in-c/
-// https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
-// https://www.geeksforgeeks.org/strchr-in-c/
-// https://www.w3schools.com/c/ref_string_strstr.php
-// https://en.cppreference.com/w/c/language/main_function.html
+// 12.  https://www.w3schools.com/c/ref_string_strncmp.php
+// 13.  https://www.geeksforgeeks.org/strcspn-in-c/
+// 14.  https://www.geeksforgeeks.org/strtok-strtok_r-functions-c-examples/
+// 15.  https://www.geeksforgeeks.org/strchr-in-c/
+// 16.  https://www.w3schools.com/c/ref_string_strstr.php
+// 17.  https://en.cppreference.com/w/c/language/main_function.html
 
 // - Error handling and checks
-// https://www.geeksforgeeks.org/use-fflushstdin-c/
-// https://www.geeksforgeeks.org/eof-and-feof-in-c/
-// https://www.tutorialspoint.com/c_standard_library/c_function_ferror.htm
+// 18.  https://www.geeksforgeeks.org/use-fflushstdin-c/
+// 19.  https://www.geeksforgeeks.org/eof-and-feof-in-c/
+// 20   https://www.tutorialspoint.com/c_standard_library/c_function_ferror.htm
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,6 +62,7 @@ char *wishPathList[100];
 int wishPathCount = 0;
 int path_modified = 0;
 
+// Clears the path list and resets the count
 void clear_path_list() {
     for (int i = 0; i < wishPathCount; i++) {
         free(wishPathList[i]);
@@ -67,6 +71,7 @@ void clear_path_list() {
     wishPathCount = 0;
 }
 
+// Checks if the given path is directory
 int is_path_directory(const char *path) {
     struct stat statbuf;
     if (stat(path, &statbuf) != 0) {
@@ -76,6 +81,7 @@ int is_path_directory(const char *path) {
     return S_ISDIR(statbuf.st_mode);
 }
 
+// Main function to initialize the shell and handle input
 int main(int argc, char *argv[]) {
 
     wishPathList[wishPathCount++] = strdup("/bin");
@@ -114,7 +120,7 @@ int main(int argc, char *argv[]) {
 
         if (line == NULL) {
             if (feof(inputFile)) {
-                printf("Goodbye!\n");
+                printf("\nGoodbye!\n");
                 break;
             }
             else {
@@ -183,7 +189,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-// käytetty lähdettä - https://brennan.io/2015/01/16/write-a-shell-in-c/
+// used source: 1
 // Reads a line from standard input and returns a dynamically allocated string
 char *ReadLine(void) {
     char *line = NULL;
@@ -232,9 +238,7 @@ char *readLineForFile(FILE *inputFile) {
 
 // Executes a command line, splitting it by '&' and running each command in parallel
 // Each command is run in a separate child process
-// lähteet:
-// https://jacksonmowry.github.io/shell.html
-// https://brennan.io/2015/01/16/write-a-shell-in-c/
+// used sources: 1, 4.
 void Execute(char *line, const char *shellRoot) {
 
     char lineCopy[1024];
@@ -285,6 +289,7 @@ void runSingleCommand(char *line, const char *shellRoot) {
     char *outputFile = NULL;
     int redirectOutput = 0;
 
+    // Check for output redirection '>'
     while (token != NULL && i < 64) {
 
         if (strcmp(token, ">") == 0) {
@@ -296,10 +301,15 @@ void runSingleCommand(char *line, const char *shellRoot) {
                 return;
             }
 
-            printf("Output written to file: %s\n", token);
 
             outputFile = token;
             token = strtok(NULL, " ");
+
+            if (token != NULL) {
+                fprintf(stderr, "Redirection misformatted\n");
+                return;
+            }
+
             continue;
         }
 
@@ -318,6 +328,7 @@ void runSingleCommand(char *line, const char *shellRoot) {
     }
 
     if (strcmp(args[0], "cat") == 0) {
+        // If output redirection is specified, write to the file
         if (redirectOutput && outputFile != NULL) {
             writeOutputToFile(redirectOutput, outputFile);
         }
@@ -327,6 +338,11 @@ void runSingleCommand(char *line, const char *shellRoot) {
     }
 
     if (strcmp(args[0], "pwd") == 0) {
+        if (i > 1) {
+            fprintf(stderr, "pwd: too many arguments\n");
+            return;
+        }
+
         if (redirectOutput && outputFile != NULL) {
             writeOutputToFile(redirectOutput, outputFile);
         }
@@ -336,6 +352,11 @@ void runSingleCommand(char *line, const char *shellRoot) {
     }
 
     if (strcmp(args[0], "help") == 0) {
+        if (i > 1) {
+            fprintf(stderr, "help: too many arguments\n");
+            return;
+        }
+
         if (redirectOutput && outputFile != NULL) {
             writeOutputToFile(redirectOutput, outputFile);
         }
@@ -344,29 +365,41 @@ void runSingleCommand(char *line, const char *shellRoot) {
         return;
     }
 
-    if (strcmp(args[0], "ls") == 0 && args[1] != NULL && strcmp(args[1], "-la") == 0) {
-        if (redirectOutput && outputFile != NULL) {
-            writeOutputToFile(redirectOutput, outputFile);
-        }
-
-        wishLsLa();
-        return;
-    }
-
+    // handle ls and ls -la commands
     if (strcmp(args[0], "ls") == 0) {
+        if (args[1] != NULL && strcmp(args[1], "-la") != 0) {
+            fprintf(stderr, "ls: unsupported argument '%s'\n", args[1]);
+            return;
+        }
+
         if (redirectOutput && outputFile != NULL) {
             writeOutputToFile(redirectOutput, outputFile);
         }
 
-        wishLs();
+        if (args[1] != NULL && strcmp(args[1], "-la") == 0) {
+            if (i > 2) {
+                fprintf(stderr, "ls -la: too many arguments\n");
+                return;
+            } 
+            wishLsLa();
+        } else {
+            wishLs();
+        }
         return;
     }
+
 
     if (strcmp(args[0], "echo") == 0) {
-        wishEcho(i, args, redirectOutput, outputFile);
+        if (args[1] == NULL) {
+            fprintf(stderr, "echo: expected arguments\n");
+            return;
+        } else {
+            wishEcho(i, args, redirectOutput, outputFile);
+        }
         return;
     }
 
+    // If the command is not a built-in command, search for the executable in PATH
     pid_t pid = fork();
 
     if (pid < 0) {
@@ -403,7 +436,7 @@ char *searchExecutable(const char *command) {
 
 // Redirects the output to the specified file
 // If the file does not exist, it will be created
-// dup2 käytetty
+// used sources: 6, 7, 8, 9.
 void writeOutputToFile(int redirectOutput, const char *outputFile) {
 
     int fd = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -412,6 +445,8 @@ void writeOutputToFile(int redirectOutput, const char *outputFile) {
         perror("Cannot open file for writing");
         exit(1);
     }
+
+    printf("Output written to file: %s\n", outputFile);
 
     dup2(fd, STDOUT_FILENO);
     close(fd);
@@ -457,16 +492,19 @@ int changeDirectory(char *args[], const char *shellRoot) {
 
     char cwd[1024];
 
+    // Get the current working directory
     if (getcwd(cwd, sizeof(cwd)) == NULL){
         perror("getcwd");
         return -1;
     }
 
+    // If no directory is specified, change to the home directory
     if (args[1] == NULL) {
         fprintf(stderr, "cd: no directory specified\n");
         return -1;
     }
 
+    // If no directory is specified, change to the home directory
     if (args[1] == NULL) {
         if (chdir(getenv("HOME")) == -1) {
             perror("cd");
@@ -475,6 +513,7 @@ int changeDirectory(char *args[], const char *shellRoot) {
         return 1;
     }
 
+    // If the specified directory is "..", change to the parent directory
     if (strcmp(args[1], "..") == 0) {
         if (strcmp(cwd, shellRoot) == 0) {
             printf("Already at root directory\n");
@@ -500,6 +539,7 @@ void wishPwd(const char *shellRoot) {
         return;
     }
 
+    // Get the current working directory
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
         const char *relative = cwd + strlen(shellRoot);
         if (relative[0] == '\0'){
@@ -526,6 +566,7 @@ void wishHelp() {
     printf("  echo [text] > [file] - write text to file\n");
     printf("  path [dirs]  - set or print PATH directories\n");
     printf("  > [file]     - redirect output to file\n");
+    printf("  &            - run commands in parallel\n");
     printf("  Note: 'wish' is the name of this shell.\n");
 }
 
@@ -538,6 +579,7 @@ void wishLs() {
         return;
     }
 
+    // Fork a new process to run the ls command
     pid_t pid = fork();
 
     if (pid == -1) {
@@ -564,6 +606,7 @@ void wishLsLa() {
         return;
     }
 
+    // Fork a new process to run the ls -la command
     pid_t pid = fork();
 
     if (pid == -1) {
@@ -585,6 +628,7 @@ void wishLsLa() {
 // If no arguments are given, prints the current PATH
 // If arguments are given, updates the PATH with the specified directories
 // If a directory is not valid, it will print a warning
+// used sources: 10, 11.
 void wishPath(char *input) {
     char *args = strchr(input, ' ');
 
@@ -594,6 +638,7 @@ void wishPath(char *input) {
         clear_path_list();
     }
 
+    // If no arguments are given, print the current PATH
     if (args == NULL) {
         if (wishPathCount == 0) {
             printf("PATH is empty\n");
@@ -613,18 +658,21 @@ void wishPath(char *input) {
 
     args++;
 
+    // Check if the input is empty after 'path '
     char *pathsCopy = strdup(args);
     if (pathsCopy == NULL) {
         perror("strdup failed");
         return;
     }
 
+    // If the input is empty, clear the path list
     for (int i = 0; i < wishPathCount; i++) {
         free(wishPathList[i]);
         wishPathList[i] = NULL;
     }
     wishPathCount = 0;
 
+    // Split the input by ':' to get individual paths
     char *subtoken = strtok(pathsCopy, ":");
     while (subtoken != NULL) {
         if (is_path_directory(subtoken)) {
@@ -643,13 +691,25 @@ void wishPath(char *input) {
 // Prints the arguments passed to echo command
 // If output redirection is specified, writes to the specified file
 void wishEcho(int argc, char **argv, int redirect, char *outfile) {
-    if (argc < 2) {
-        fprintf(stderr, "echo: expected arguments\n");
+
+    // Check if the first argument is "echo"
+    char *path = searchExecutable("echo");
+    if (path == NULL) {
+        fprintf(stderr, "echo: command not found\n");
         return;
     }
 
     FILE *output = stdout;
+    int end = argc;
 
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], ">") == 0) {
+            end = i;
+            break;
+        }
+    }
+
+    // Open the file for writing
     if (redirect && outfile != NULL) {
         output = fopen(outfile, "w");
         if (output == NULL) {
@@ -658,9 +718,10 @@ void wishEcho(int argc, char **argv, int redirect, char *outfile) {
         }
     }
 
-    for (int i = 1; i < argc; i++) {
+    // Print the arguments to the output
+    for (int i = 1; i < end; i++) {
         fprintf(output, "%s", argv[i]);
-        if (i < argc - 1) {
+        if (i < end - 1) {
             fprintf(output, " ");
         }
     }
@@ -668,6 +729,7 @@ void wishEcho(int argc, char **argv, int redirect, char *outfile) {
     fprintf(output, "\n");
 
     if (output != stdout) {
+        printf("Output written to file: %s\n", outfile);
         fclose(output);
     }
 }

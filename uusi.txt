@@ -1,0 +1,8 @@
+batch.txt
+file.txt
+test
+test.txt
+tiedosto.txt
+uusi.txt
+wish
+wish.c
